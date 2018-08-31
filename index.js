@@ -12,5 +12,10 @@ const _modem = new Modem({
   },
 });
 
-_modem.send('AT+NRB');
+_modem.call('AT+NRB').then(result => {
+  console.log(`result = ${result}`, result);
+});
 
+_modem.call('AT+NRB').then(result => {
+  console.log(`result = ${result}`, result);
+});
