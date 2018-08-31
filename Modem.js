@@ -14,7 +14,13 @@ function Queue() {
 }
 
 function Modem(options, callbacks = {}) {
-  this.port = new SerialPort(options.port, {baudRate: options.baudRate});
+  this.port = new SerialPort(
+      options.port, {
+        baudRate: options.baudRate,
+      },
+  );
+
+  let _ready = false;
   let _queue = new Queue();
   let _pending = false;
   let _buffer = [];
@@ -23,31 +29,55 @@ function Modem(options, callbacks = {}) {
   let _seq = 0;
   let _current_task;
 
+  this.port.on('open', () => {
+    console.log('port openned');
+    this.port.write('\r\n');
+    callbacks.onOpen();
+    setTimeout(() => {
+      _ready = true;
+    }, 500);
+  });
+
+  this.port.on('error', () => {
+    console.log('error');
+  });
+
   let _timer1 = setInterval(() => {
-    if (_pending || _queue.size() === 0) return;
+    if (!_ready || _pending || _queue.size() === 0) {
+      return;
+    }
+
     _current_task = _queue.shift();
-    if (_current_task)
+
+    if (_current_task) {
+      // console.log(`> executing... ${_current_task.cmd}`);
+      // console.log(`>> Q=${_queue.tasks.length}`);
       send(_current_task.cmd);
+    }
   }, 100);
 
   _parser.on('data', data => {
     const d = {cmd: _command, resp: _buffer};
     if (data.toString() === 'OK') {
       _pending = false;
+      d.resp.push('OK');
       this.onData(d);
       _buffer = [];
       _current_task.resolve(d);
       _command = undefined;
     }
     else if (data.toString() === 'ERROR') {
+      d.resp.push('ERROR');
       _pending = false;
       _current_task.reject(d);
       _buffer = [];
       _command = undefined;
+      console.log('... ERROR');
     }
     else {
       _buffer.push(data);
     }
+    console.log(data.toString());
   });
 
   this.onData = function(data) {
@@ -62,7 +92,8 @@ function Modem(options, callbacks = {}) {
     this.port.write('\r\n');
   };
 
-  this.call = cmd => {
+  this.call = (cmd) => {
+    // console.log(`modem.call ${cmd} q=${_queue.size()}`);
     const data = {
       promise: null,
       resolve: null,

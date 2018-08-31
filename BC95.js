@@ -2,18 +2,18 @@ const Modem = require('./Modem');
 const EventEmitter = require('events').EventEmitter;
 const util = require('util');
 
-const _modem = new Modem({
-  port: '/dev/tty.usbserial-DO01E4MX',
-  baudRate: 9600,
-}, {
-  onData: function(data) {
-    // console.log(data.resp.map(v => v.toString()));
-  },
-});
-
-function BC95() {
+function BC95({port, baudRate}, cb) {
   this.nbConnected = false;
   this.ipAddress;
+  this.firstConect = true;
+
+  let _modem = new Modem({port, baudRate}, {
+    onData: function(data) { },
+    onOpen: function() {
+      console.log('cb onOpen');
+    },
+  });
+
   EventEmitter.call(this);
 
   this.queryIpAddress = () => {
@@ -32,49 +32,76 @@ function BC95() {
     });
   };
 
-  setInterval(() => {
-    _modem.call('AT+CGATT?').
-        then(result => result.resp[0].toString()).
-        then(response => response === '+CGATT:1').
-        then(connected => {
-          if (this.nbConnected !== connected) {
-            this.nbConnected = connected;
-            if (connected) {
-              const promises = [
-                this.queryIpAddress().then(ip => {
-                  this.ipAddr = ip;
-                }),
-                this.queryRSSI().then(rssi => {
-                  this.rssi = rssi;
-                }),
-              ];
+  this.createUDPSocket = (port, enableRecv = 1) => {
+    enableRecv = enableRecv ? 1 : 0;
+    return _modem.call(`AT+NSOCR=DGRAM,17,${port},${enableRecv}`);
+  };
 
-              Promise.all(promises).then(results => {
-                this.emit('connected');
-              });
+  this.sendUDPMessage = (socketId, ip, port, payload) => {
+    const seq = 1;
+    const payloadHex = payload.toString('hex');
+    console.log('at', payloadHex);
+    console.log(`AT+NSOST=${socketId},${ip},${port},2,${payloadHex}`);
+
+    return _modem.call(
+        `AT+NSOST=${socketId},${ip},${port},2,${payloadHex}`);
+  };
+
+  this.call = (cmd) => {
+    return _modem.call(cmd);
+  };
+
+  this.begin = () => {
+    firstConnect();
+  };
+
+  const firstConnect = () => {
+    const intervalId = setInterval(() => {
+      _modem.call('AT+CGATT?').
+          then(result => result.resp[0].toString()).
+          then(response => response === '+CGATT:1').
+          then(connected => {
+            if (this.nbConnected !== connected) {
+              this.nbConnected = connected;
+              if (connected) {
+                const afterConnectedPromises = [
+                  this.queryIpAddress().then(ip => {
+                    this.ipAddr = ip;
+                  }),
+                  this.queryRSSI().then(rssi => {
+                    this.rssi = rssi;
+                  }),
+                ];
+                Promise.all(afterConnectedPromises).then(results => {
+                  this.emit('connected');
+                  clearInterval(intervalId);
+                });
+              }
+              else
+                this.emit('disconnected');
             }
-            else
-              this.emit('disconnected');
-          }
-          else {
-            if (!this.nbConnected) {
-              this.emit('connecting');
+            else {
+              if (!this.nbConnected) {
+                this.emit('connecting');
+              }
             }
-          }
-        });
+          });
+    }, 2000);
+  };
 
-    _modem.call('AT+CGPADDR').then(result => {
-      let splittedArray = result.resp.toString().split(',');
-      this.ipAddr = splittedArray[1];
-    });
+  // firstConnect();
 
-    if (this.nbConnected)
-      _modem.call('AT+CSQ').then(resp => {
-      }).catch(err => {
-
-      });
-
-  }, 2 * 1000);
+  // setInterval(() => {
+  //   if (this.nbConnected) {
+  //     // _modem.call('AT+CGPADDR').then(result => {
+  //     //   let splittedArray = result.resp.toString().split(',');
+  //     //   this.ipAddr = splittedArray[1];
+  //     // });
+  //     // _modem.call('AT+CSQ').then(resp => { }).catch(err => {
+  //     // });
+  //   }
+  //
+  // }, 2 * 1000);
 
   this.resetModule = (cb) => {
     return _modem.call('AT+NRB').
