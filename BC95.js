@@ -16,6 +16,22 @@ function BC95() {
   this.ipAddress;
   EventEmitter.call(this);
 
+  this.queryIpAddress = () => {
+    return _modem.call('AT+CGPADDR').then(result => {
+      let splittedArray = result.resp.toString().split(',');
+      return this.ipAddr = splittedArray[1];
+    });
+  };
+
+  this.queryRSSI = () => {
+    return _modem.call('AT+CSQ').then(result => {
+      let splittedArray = result.resp.toString().split(',');
+      let rssi = splittedArray[0].split(':')[1];
+      rssi = (2 * rssi) - 113;
+      return rssi;
+    });
+  };
+
   setInterval(() => {
     _modem.call('AT+CGATT?').
         then(result => result.resp[0].toString()).
@@ -23,8 +39,20 @@ function BC95() {
         then(connected => {
           if (this.nbConnected !== connected) {
             this.nbConnected = connected;
-            if (connected)
-              this.emit('connected');
+            if (connected) {
+              const promises = [
+                this.queryIpAddress().then(ip => {
+                  this.ipAddr = ip;
+                }),
+                this.queryRSSI().then(rssi => {
+                  this.rssi = rssi;
+                }),
+              ];
+
+              Promise.all(promises).then(results => {
+                this.emit('connected');
+              });
+            }
             else
               this.emit('disconnected');
           }
