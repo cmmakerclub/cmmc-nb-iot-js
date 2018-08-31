@@ -32,15 +32,5 @@ function Modem(options, callbacks = {}) {
   };
 }
 
-//
-// const createTimer = function() {
-//   const waitTimeout = 300;
-//   const timerId = setInterval(function() {
-//   }, waitTimeout);
-//
-//   return new Promise((resolve, reject) => {
-//
-//   });
-// };
 
 module.exports = Modem;
