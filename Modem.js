@@ -2,7 +2,6 @@
 
 const SerialPort = require('serialport');
 const Delimiter = SerialPort.parsers.Delimiter;
-const async = require('async');
 
 function Queue() {
   this.tasks = [];
@@ -17,13 +16,21 @@ function Queue() {
 
 function Modem(options, callbacks = {}) {
   this.port = new SerialPort(options.port, {baudRate: options.baudRate});
-  let _promise;
   let _queue = new Queue();
   let _pending = false;
   let _buffer = [];
   let _parser = this.port.pipe(new Delimiter({delimiter: '\r\n'}));
   let _command = '';
   let _seq = 0;
+  let _current_task;
+
+  let _timer = setInterval(() => {
+    if (_pending || _queue.size() === 0) return;
+    _current_task = _queue.shift();
+    console.log(`executing.... ${_current_task.cmd}`);
+    if (_current_task)
+      send(_current_task.cmd);
+  }, 100);
 
   _parser.on('data', data => {
     const d = {cmd: _command, buffer: _buffer};
@@ -31,7 +38,7 @@ function Modem(options, callbacks = {}) {
       this.onData(d);
       _command = undefined;
       _buffer = [];
-      const t = _queue.shift();
+      const t = _current_task;
       t.resolve(d);
     }
     else {
@@ -40,11 +47,13 @@ function Modem(options, callbacks = {}) {
   });
 
   this.onData = function(data) {
+    _pending = false;
     const onData = callbacks.onData;
     onData && onData(data);
   };
 
   let send = cmd => {
+    _pending = true;
     _command = cmd;
     this.port.write(cmd);
     this.port.write('\r\n');
@@ -52,23 +61,22 @@ function Modem(options, callbacks = {}) {
 
   this.call = cmd => {
     const data = {
+      promise: null,
       resolve: null,
       reject: null,
       seq: _seq++,
       cmd,
     };
+    let deferred = (d =>
+        (resolve, reject) => {
+          d.resolve = resolve;
+          d.reject = reject;
+        })(data);
+
+    data.promise = new Promise(deferred);
+    console.log(`queue size = ${_queue.size()}`);
     _queue.push(data);
-    let deferred = (function(data) {
-      let d = data;
-      return (resolve, reject) => {
-        d.resolve = resolve;
-        d.reject = reject;
-      };
-    })(data);
-
-    send(cmd);
-
-    return new Promise(deferred);
+    return data.promise;
   };
 
 }
