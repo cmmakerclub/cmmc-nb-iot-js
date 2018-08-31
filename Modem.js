@@ -3,36 +3,44 @@
 const SerialPort = require('serialport');
 const Delimiter = SerialPort.parsers.Delimiter;
 
-class Modem {
-  constructor(options, callbacks = {}) {
-    this.callbacks = callbacks;
-    this.command = '';
-    this.buffer = [];
-    this.port = new SerialPort(options.port, {baudRate: options.baudRate});
-    this.parser = this.port.pipe(new Delimiter({delimiter: '\r\n'}));
+function Modem(options, callbacks = {}) {
+  this.port = new SerialPort(options.port, {baudRate: options.baudRate});
+  let buffer = [];
+  let parser = this.port.pipe(new Delimiter({delimiter: '\r\n'}));
+  let command = '';
 
-    this.parser.on('data', (data) => {
-      if (data.toString() === 'OK') {
-        this.onData({cmd: this.command, buffer: this.buffer});
-        this.command = undefined;
-        this.buffer = [];
-      }
-      else {
-        this.buffer.push(data);
-      }
-    });
-  }
+  parser.on('data', data => {
+    if (data.toString() === 'OK') {
+      this.onData({cmd: command, buffer: buffer});
+      command = undefined;
+      buffer = [];
+    }
+    else {
+      buffer.push(data);
+    }
+  });
 
-  onData(data) {
-    const onData = this.callbacks.onData;
+  this.onData = function(data) {
+    const onData = callbacks.onData;
     onData && onData(data);
-  }
+  };
 
-  send(cmd) {
-    this.command = cmd;
+  this.send = function(cmd) {
+    command = cmd;
     this.port.write(cmd);
     this.port.write('\r\n');
   };
 }
+
+//
+// const createTimer = function() {
+//   const waitTimeout = 300;
+//   const timerId = setInterval(function() {
+//   }, waitTimeout);
+//
+//   return new Promise((resolve, reject) => {
+//
+//   });
+// };
 
 module.exports = Modem;
