@@ -2,7 +2,15 @@
 
 const Modem = require('./Modem');
 
-const _modem = new Modem({port: '/dev/tty.usbserial-DO01E4MX', baudRate: 9600});
+const _modem = new Modem({
+  port: '/dev/tty.usbserial-DO01E4MX',
+  baudRate: 9600,
+}, {
+  onData: function(data) {
+    console.log(data);
+    console.log(data.buffer.map(v => v.toString()));
+  },
+});
 
 let busy = 0;
 let buffer = [];
@@ -13,26 +21,7 @@ const AT = {
   hello: 'AT',
 };
 
-_modem.send('AT');
-
-
-let nbConnected = false;
-const CMD_LIST = [];
-
-const BC95 = function() {
-  const CMD_LIST = [];
-  let connected = false;
-
-};
-
-const isConnected = function() {
-  call('AT+CGATT?');
-  return nbConnected;
-};
-
-const call = function(command) {
-  CMD_LIST.push(command);
-};
+_modem.send('AT+NRB');
 
 // setInterval(function () {
 //   console.log(`attachNB? = ${isConnected()}`)
