@@ -1,66 +1,47 @@
 // const Buffer = require('safe-buffer').Buffer
 
-const SerialPort = require('serialport')
-const Delimiter = SerialPort.parsers.Delimiter
-let busy = 0
+const Modem = require('./Modem');
 
-const CMD_LIST = []
-let buffer = []
+const _modem = new Modem({port: '/dev/tty.usbserial-DO01E4MX', baudRate: 9600});
+
+let busy = 0;
+let buffer = [];
+
 const AT = {
   reset: 'AT+NRB',
   cgatt: 'AT+CGATT',
-  hello: 'AT'
-}
+  hello: 'AT',
+};
 
-let nbConnected = false
+_modem.send('AT');
 
-const isConnected = function () {
-  call('AT+CGATT?')
-  return nbConnected
-}
 
-const port = new SerialPort('/dev/tty.usbserial-DO01E4MX', {
-  baudRate: 9600
-})
+let nbConnected = false;
+const CMD_LIST = [];
 
-const parser = port.pipe(new Delimiter({delimiter: '\r\n'}))
+const BC95 = function() {
+  const CMD_LIST = [];
+  let connected = false;
 
-const send = function (cmd) {
-  busy = true
-  port.write(cmd)
-  port.write('\r\n')
-}
+};
 
-const call = function (command) {
-  CMD_LIST.push(command)
-}
+const isConnected = function() {
+  call('AT+CGATT?');
+  return nbConnected;
+};
 
-parser.on('data', function (data) {
-  // console.log('incoming data.. ' + data)
-  if (data.toString() === 'OK') {
-    if (buffer[0] === '+CGATT:1') {
-      nbConnected = true
-    }
-    else if (buffer[0] === '+CGATT:0') {
-      nbConnected = false
-    }
-    busy = false
-    buffer = []
-  }
-  else {
-    buffer.push(data.toString())
-  }
-})
+const call = function(command) {
+  CMD_LIST.push(command);
+};
 
-call(AT.reset)
-setInterval(function () {
-  console.log(`attachNB? = ${isConnected()}`)
-}, 1000)
-
-setInterval(function () {
-  const cmd = CMD_LIST.shift()
-  if (cmd && !busy) {
-    // console.log(`queue size = ${CMD_LIST.length}`)
-    send(cmd)
-  }
-}, 500)
+// setInterval(function () {
+//   console.log(`attachNB? = ${isConnected()}`)
+// }, 1000)
+//
+// setInterval(function () {
+//   const cmd = CMD_LIST.shift()
+//   if (cmd && !busy) {
+//     // console.log(`queue size = ${CMD_LIST.length}`)
+//     send(cmd)
+//   }
+// }, 500)
