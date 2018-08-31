@@ -11,7 +11,6 @@ function Queue() {
   };
 
   this.size = () => this.tasks.length;
-
 }
 
 function Modem(options, callbacks = {}) {
@@ -24,10 +23,9 @@ function Modem(options, callbacks = {}) {
   let _seq = 0;
   let _current_task;
 
-  let _timer = setInterval(() => {
+  let _timer1 = setInterval(() => {
     if (_pending || _queue.size() === 0) return;
     _current_task = _queue.shift();
-    console.log(`executing.... ${_current_task.cmd}`);
     if (_current_task)
       send(_current_task.cmd);
   }, 100);
@@ -35,10 +33,17 @@ function Modem(options, callbacks = {}) {
   _parser.on('data', data => {
     const d = {cmd: _command, resp: _buffer};
     if (data.toString() === 'OK') {
+      _pending = false;
       this.onData(d);
-      _command = undefined;
       _buffer = [];
       _current_task.resolve(d);
+      _command = undefined;
+    }
+    else if (data.toString() === 'ERROR') {
+      _pending = false;
+      _current_task.reject(d);
+      _buffer = [];
+      _command = undefined;
     }
     else {
       _buffer.push(data);
@@ -46,7 +51,6 @@ function Modem(options, callbacks = {}) {
   });
 
   this.onData = function(data) {
-    _pending = false;
     const onData = callbacks.onData;
     onData && onData(data);
   };
@@ -72,10 +76,7 @@ function Modem(options, callbacks = {}) {
     })(data);
 
     data.promise = new Promise(deferred);
-
-    // console.log(`queue size = ${_queue.size()}`);
     _queue.push(data);
-
     return data.promise;
   };
 
