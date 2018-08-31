@@ -38,8 +38,7 @@ function Modem(options, callbacks = {}) {
       this.onData(d);
       _command = undefined;
       _buffer = [];
-      const t = _current_task;
-      t.resolve(d);
+      _current_task.resolve(d);
     }
     else {
       _buffer.push(data);
@@ -67,15 +66,16 @@ function Modem(options, callbacks = {}) {
       seq: _seq++,
       cmd,
     };
-    let deferred = (d =>
-        (resolve, reject) => {
-          d.resolve = resolve;
-          d.reject = reject;
-        })(data);
+    let deferred = (d => (resolve, reject) => {
+      d.resolve = resolve;
+      d.reject = reject;
+    })(data);
 
     data.promise = new Promise(deferred);
-    console.log(`queue size = ${_queue.size()}`);
+
+    // console.log(`queue size = ${_queue.size()}`);
     _queue.push(data);
+
     return data.promise;
   };
 
