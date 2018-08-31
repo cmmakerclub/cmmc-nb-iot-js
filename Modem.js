@@ -33,7 +33,7 @@ function Modem(options, callbacks = {}) {
   }, 100);
 
   _parser.on('data', data => {
-    const d = {cmd: _command, buffer: _buffer};
+    const d = {cmd: _command, resp: _buffer};
     if (data.toString() === 'OK') {
       this.onData(d);
       _command = undefined;
