@@ -39,13 +39,20 @@ function BC95({port, baudRate}) {
         if (event === 'NSONMI') {
           const [match, socketId, len] = resp.match(processors.NSONMI);
           console.log(`found +NSONMI socket=${socketId}, len=${len}`);
-          // _modem.call(`AT+NSORF=${socket},${len}`).then(response => {
-          //   let [socket, ip_addr, port, length, data, remaining_length] =
-          //       response.resp[1].split(',');
-          //   let args = {socket, ip_addr, port, length, data, remaining_length};
-          //   _buffer = [args];
-          //   this.emit('data', args);
-          // });
+          _modem.call(`AT+NSORF=${socketId},${len}`).then(response => {
+            const d = response.resp[0].split(',');
+            // <socket>,<ip_addr>,<port>,<length>,<data>,<remaining_ length>
+            // 0,192.168.5.1,1024,2,ABAB,0
+            // const matcher = /^(\d+),(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}),(\d+),(\d+),(\w+),(\d+)/;
+            // const matched = response.resp[0].match(matcher);
+            // console.log(matcher);
+            let [socket, ip_addr, port, length, data, remaining_length] = d;
+            //     response.resp[0].match(
+            //         /^(\d+),(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}),(\d+),(\d+),(\w+),(\d+)/g);
+            let args = {socket, ip_addr, port, length, data, remaining_length};
+            console.log(args);
+            this.emit('data', args);
+          });
         }
         else if (event === 'CSQ') {
           let [match, raw_rssi, ber] = resp.match(processors.CSQ);
