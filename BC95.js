@@ -9,8 +9,25 @@ function BC95({port, baudRate}, cb) {
   let _buffer = [];
 
   let _modem = new Modem({port, baudRate}, {
-    onData: function({cmd, resp}) {
-      console.log('> ON DATA..', cmd, resp);
+    onData: (args) => {
+      let {
+        resolve, reject, cmd, resp,
+      } = args;
+      resp = resp.toString();
+      _buffer.push(resp);
+      console.log('> ON DATA..', cmd);
+      if (resp === 'OK') {
+        console.log('got ok');
+        resolve().with({cmd, resp: _buffer});
+        _buffer = [];
+      }
+      else if (resp === 'ERROR') {
+        reject().with({cmd, resp: _buffer});
+        _buffer = [];
+      }
+      else {
+        // console.log('>>>', _buffer[0]);
+      }
     },
     onOpen: function() {
       console.log('cb onOpen');
@@ -59,6 +76,7 @@ function BC95({port, baudRate}, cb) {
   };
 
   this.begin = () => {
+    console.log('begin called');
     firstConnect();
   };
 
@@ -113,13 +131,14 @@ function BC95({port, baudRate}, cb) {
   this.resetModule = (cb) => {
     return _modem.call('AT+NRB').
         then(result => {
+          console.log('NRB result');
           if (cb) {
             cb(false, result);
           }
         }).catch(err => {
+          console.log('catch');
           cb(err, null);
         });
-
   };
 
 }
