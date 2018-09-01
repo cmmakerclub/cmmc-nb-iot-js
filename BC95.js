@@ -3,7 +3,7 @@ const EventEmitter = require('events').EventEmitter;
 const util = require('util');
 
 function BC95({port, baudRate}, cb) {
-  this.nbConnected = false;
+  this.neverConnected = true;
   this.ipAddress;
   this.firstConect = true;
   let _buffer = [];
@@ -76,7 +76,26 @@ function BC95({port, baudRate}, cb) {
 
   this.begin = () => {
     console.log('begin called');
-    firstConnect();
+    const intervalId = setInterval(() => {
+      this.isAttachedNB().then(isConnected => {
+        if (isConnected) {
+          this.updateNBAttributes().then(() => {
+            this.neverConnected = false;
+            clearInterval(intervalId);
+            this.emit('connected');
+          });
+        } else {
+          this.emit('connecting');
+        }
+      });
+    }, 2000);
+
+    this.mainInterval = setInterval(() => {
+      if (this.neverConnected) return;
+      this.updateNBAttributes().then((results) => {
+        console.log('main interval.');
+      });
+    }, 30 * 1000);
   };
 
   this.isAttachedNB = () => {
@@ -106,18 +125,6 @@ function BC95({port, baudRate}, cb) {
   };
 
   const firstConnect = () => {
-    const intervalId = setInterval(() => {
-      this.isAttachedNB().then(isConnected => {
-        if (isConnected) {
-          this.updateNBAttributes().then(() => {
-            clearInterval(intervalId);
-            this.emit('connected');
-          });
-        } else {
-          this.emit('connecting');
-        }
-      });
-    }, 2000);
   };
 
   // firstConnect();
