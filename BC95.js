@@ -15,9 +15,7 @@ function BC95({port, baudRate}, cb) {
       } = args;
       resp = resp.toString();
       _buffer.push(resp);
-      console.log('> ON DATA..', cmd);
       if (resp === 'OK') {
-        console.log('got ok');
         resolve().with({cmd, resp: _buffer});
         _buffer = [];
       }
@@ -26,6 +24,7 @@ function BC95({port, baudRate}, cb) {
         _buffer = [];
       }
       else {
+        // console.log('ELSE: ' + cmd);
         // console.log('>>>', _buffer[0]);
       }
     },
@@ -39,20 +38,20 @@ function BC95({port, baudRate}, cb) {
   this.queryIpAddress = () => {
     return _modem.call('AT+CGPADDR').then(result => {
       let splittedArray = result.resp.toString().split(',');
-      return this.ipAddr = splittedArray[1];
+      return {ip: splittedArray[1]};
     });
   };
 
   this.queryRSSI = () => {
-    const map = (x, in_min, in_max, out_min, out_max) => {
-      return (x - in_min) * (out_max - out_min) / (in_max - in_min) + out_min;
-    };
+    const map = (x, in_min, in_max, out_min, out_max) => (x - in_min) *
+        (out_max - out_min) / (in_max - in_min) + out_min;
     return _modem.call('AT+CSQ').then(result => {
       let splittedArray = result.resp.toString().split(',');
       let rssi = splittedArray[0].split(':')[1];
-      console.log(`rssi =${map(rssi, 0, 31, 0, 100)}%`);
+      const percent = map(rssi, 0, 31, 0, 100).toFixed(2);
       rssi = (2 * rssi) - 113;
-      return rssi;
+      console.log(`rssi ${rssi} ${percent}%`);
+      return {rssi, percent};
     });
   };
 
@@ -80,38 +79,44 @@ function BC95({port, baudRate}, cb) {
     firstConnect();
   };
 
+  this.isAttachedNB = () => {
+    return _modem.call('AT+CGATT?').
+        then(result => {
+          return result.resp[0].toString() === '+CGATT:1';
+        });
+  };
+
+  this.updateNBAttributes = () => {
+    return Promise.all(
+        [
+          this.queryIpAddress().then(args => {
+            let {ip} = args;
+            this.ipAddr = ip;
+            return args;
+          }),
+          this.queryRSSI().then(args => {
+            let {rssi, percent} = args;
+            this.rssi = rssi;
+            return args;
+          }),
+        ],
+    ).then((args) => {
+      // console.log('done all promises.', args);
+    });
+  };
+
   const firstConnect = () => {
     const intervalId = setInterval(() => {
-      _modem.call('AT+CGATT?').
-          then(result => result.resp[0].toString()).
-          then(response => response === '+CGATT:1').
-          then(connected => {
-            if (this.nbConnected !== connected) {
-              this.nbConnected = connected;
-              if (connected) {
-                Promise.
-                    all([
-                      this.queryIpAddress().then(ip => {
-                        this.ipAddr = ip;
-                      }), this.queryRSSI().then(rssi => {
-                        this.rssi = rssi;
-                      }),
-                    ]).
-                    then(results => {
-                      this.emit('connected');
-                      clearInterval(intervalId);
-                    });
-              }
-              else {
-                this.emit('disconnected');
-              }
-            }
-            else {
-              if (!this.nbConnected) {
-                this.emit('connecting');
-              }
-            }
+      this.isAttachedNB().then(isConnected => {
+        if (isConnected) {
+          this.updateNBAttributes().then(() => {
+            clearInterval(intervalId);
+            this.emit('connected');
           });
+        } else {
+          this.emit('connecting');
+        }
+      });
     }, 2000);
   };
 

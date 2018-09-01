@@ -40,14 +40,11 @@ function Modem(options, callbacks = {}) {
   });
 
   let _timer1 = setInterval(() => {
-    // console.log(`queue size = ${_queue.size()}`)
     if (!_ready || _pending || _queue.size() === 0) {
       return;
     }
     _current_task = _queue.shift();
     if (_current_task) {
-      console.log(`> executing... ${_current_task.cmd}`);
-      console.log(`>> Q=${_queue.tasks.length}`);
       send(_current_task.cmd);
     }
   }, 200);
@@ -70,7 +67,7 @@ function Modem(options, callbacks = {}) {
   };
 
   this.call = (cmd) => {
-    console.log(`modem.call ${cmd} q=${_queue.size()}`);
+    console.log(`[enqueue] modem.call ${cmd} q=${_queue.size()}`);
     const data = {
       promise: null,
       resolve: null,
