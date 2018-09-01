@@ -52,30 +52,6 @@ function BC95({port, baudRate}) {
 
   EventEmitter.call(this);
 
-  this.processIncommingData = () => {
-    return this.call(`AT+NSORF=${0},${512}`).
-        then(response => {
-          console.log(response.resp[0]);
-          console.log(response.cmd);
-          console.log(/^\+NSONMI:(\d),(\d)/.test(response.resp[0]));
-          if (/^\+NSONMI:(\d),(\d)/.test(response.resp[0])) {
-            console.log('>found NSONMI');
-          }
-          else if (response.resp[0] !== 'OK') {
-            let [socket, ip_addr, port, length, data, remaining_length] =
-                response.resp[0].split(',');
-            let args = {socket, ip_addr, port, length, data, remaining_length};
-            this.emit('data', args);
-            return args;
-          }
-          else {
-            // console.log('at+nsorf', response);
-          }
-        }).catch(err => {
-          console.log(`on_data error =`, err);
-        });
-  };
-
   this.queryIpAddress = () => {
     return _modem.call('AT+CGPADDR').then(result => {
       let splittedArray = result.resp.toString().split(',');
