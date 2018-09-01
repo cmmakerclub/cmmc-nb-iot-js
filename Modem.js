@@ -30,9 +30,7 @@ function Modem(options, callbacks = {}) {
   this.port.on('open', () => {
     this.port.write('\r\n');
     callbacks.onOpen();
-    setTimeout(() => {
-      _ready = true;
-    }, 20);
+    _ready = true;
   });
 
   this.port.on('error', () => {
@@ -67,7 +65,8 @@ function Modem(options, callbacks = {}) {
   };
 
   this.call = (cmd) => {
-    // console.log(`[enqueue] modem.call ${cmd} q=${_queue.size()}`);
+    // console.log(`modem.enqueue ${cmd} q=${_queue.size()}`,
+    //     _queue.tasks.map(t => t.cmd));
     const data = {
       promise: null,
       resolve: null,
@@ -78,10 +77,12 @@ function Modem(options, callbacks = {}) {
     let deferred = (d => (resolve, reject) => {
       d.resolve = () => {
         _pending = false;
+        console.log(`>> resolved`);
         return {with: resolve};
       };
       d.reject = () => {
         _pending = false;
+        console.log(`>> rejected`);
         return {with: reject};
       };
     })(data);

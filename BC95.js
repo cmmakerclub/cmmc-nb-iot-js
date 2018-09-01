@@ -26,23 +26,41 @@ function BC95({port, baudRate}) {
         reject().with({cmd, resp: _buffer});
         _buffer = [];
       }
-      else {
-        const matcher = {
+      else if (/^\+/.test(resp)) {
+        const e = resp.match(/^\+(\w+):/);
+        const event = e[1];
+        const processors = {
           'NSONMI': /^\+NSONMI:(\d+),(\d+)$/,
+          'CSQ': /^\+CSQ:(\d+),(\d+)$/,
         };
-        if (matcher.NSONMI.test(resp)) {
-          console.log('RESP=>', resp);
-          const [match, socket, len] = resp.match(matcher.NSONMI);
+        console.log(`> EVENT=${e[1]}`);
+        if (event === 'NSONMI') {
+          const [match, socket, len] = resp.match(processors.NSONMI);
           console.log(`found +NSONMI socket=${socket}, len=${len}`);
           _modem.call(`AT+NSORF=${socket},${len}`).then(response => {
             let [socket, ip_addr, port, length, data, remaining_length] =
                 response.resp[1].split(',');
-            // console.log(socket, ip_addr, port, length, data, remaining_length);
-            // console.log(Buffer.from(data).toString());
             let args = {socket, ip_addr, port, length, data, remaining_length};
+            _buffer = [];
             this.emit('data', args);
           });
         }
+        else if (event === 'CSQ') {
+          let [match, rssi, ber] = resp.match(processors.CSQ);
+          const map = (x, in_min, in_max, out_min, out_max) => (x - in_min) *
+              (out_max - out_min) / (in_max - in_min) + out_min;
+          console.log(match, rssi, ber);
+          this.rssi = (2 * rssi) - 113;
+          this.rssi_percent = map(rssi, 0, 31, 0, 100).toFixed(2);
+        }
+        else if (event === 'CGATT') {
+        }
+        else {
+          console.log(`${event} is NOT IMPLEMENTED EVENT`);
+        }
+      }
+      else {
+        console.log('PENDING DATA >> ', resp);
       }
     },
     onOpen: function() {
@@ -64,15 +82,7 @@ function BC95({port, baudRate}) {
   };
 
   this.queryRSSI = () => {
-    const map = (x, in_min, in_max, out_min, out_max) => (x - in_min) *
-        (out_max - out_min) / (in_max - in_min) + out_min;
-    return _modem.call('AT+CSQ').then(result => {
-      let splittedArray = result.resp.toString().split(',');
-      let rssi = splittedArray[0].split(':')[1];
-      const percent = map(rssi, 0, 31, 0, 100).toFixed(2);
-      rssi = (2 * rssi) - 113;
-      return {rssi, percent};
-    });
+    return _modem.call('AT+CSQ');
   };
 
   this.createUDPSocket = (port, enableRecv = 1) => {
@@ -127,21 +137,21 @@ function BC95({port, baudRate}) {
       });
     }, 2000);
 
-    this.mainInterval = setInterval(() => {
-      if (this.neverConnected) return;
-      Promise.all([this.updateNBAttributes()]).
-          then(results => {
-            this.emit('update');
-          });
-    }, 10 * 1000);
-
-    setInterval(() => {
-      if (this.neverConnected) return;
-      // Promise.all([this.processIncommingData()]).
-      //     then(results => {
-      //       this.emit('update');
-      //     });
-    }, 2 * 1000);
+    // this.mainInterval = setInterval(() => {
+    //   if (this.neverConnected) return;
+    //   Promise.all([this.updateNBAttributes()]).
+    //       then(results => {
+    //         this.emit('update');
+    //       });
+    // }, 1 * 1000);
+    //
+    // setInterval(() => {
+    //   if (this.neverConnected) return;
+    //   // Promise.all([this.processIncommingData()]).
+    //   //     then(results => {
+    //   //       this.emit('update');
+    //   //     });
+    // }, 1 * 1000);
   };
 
   this.queryIMEI = () => {
@@ -168,6 +178,7 @@ function BC95({port, baudRate}) {
             return args;
           }),
           this.queryRSSI().then(args => {
+            console.log('rssi = ', args);
             let {rssi, percent} = args;
             this.rssi = rssi;
             this.rssi_percent = percent;
@@ -178,11 +189,6 @@ function BC95({port, baudRate}) {
       // console.log('done all promises.', args);
     });
   };
-
-  const firstConnect = () => {
-  };
-
-  // firstConnect();
 
   // setInterval(() => {
   //   if (this.nbConnected) {
