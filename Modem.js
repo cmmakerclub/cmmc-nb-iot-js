@@ -9,7 +9,6 @@ function Queue() {
   this.push = function(task) {
     this.tasks.push(task);
   };
-
   this.size = () => this.tasks.length;
 }
 
@@ -74,10 +73,18 @@ function Modem(options, callbacks = {}) {
       _command = undefined;
       console.log('... ERROR');
     }
-    else {
-      _buffer.push(data);
+    else if (data.toString().indexOf('+NSONMI') !== -1) {
+      _pending = false;
+      d.resp.push('+NSONMI');
+      this.onData(d);
+      _buffer = [];
+      _current_task.resolve(d);
+      _command = undefined;
     }
-    console.log(data.toString());
+    else {
+      // _buffer.push(data);
+    }
+    // console.log(data.toString());
   });
 
   this.onData = function(data) {

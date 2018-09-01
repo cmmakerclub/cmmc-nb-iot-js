@@ -6,9 +6,12 @@ function BC95({port, baudRate}, cb) {
   this.nbConnected = false;
   this.ipAddress;
   this.firstConect = true;
+  let _buffer = [];
 
   let _modem = new Modem({port, baudRate}, {
-    onData: function(data) { },
+    onData: function({cmd, resp}) {
+      console.log('> ON DATA..', cmd, resp);
+    },
     onOpen: function() {
       console.log('cb onOpen');
     },
@@ -24,9 +27,13 @@ function BC95({port, baudRate}, cb) {
   };
 
   this.queryRSSI = () => {
+    const map = (x, in_min, in_max, out_min, out_max) => {
+      return (x - in_min) * (out_max - out_min) / (in_max - in_min) + out_min;
+    };
     return _modem.call('AT+CSQ').then(result => {
       let splittedArray = result.resp.toString().split(',');
       let rssi = splittedArray[0].split(':')[1];
+      console.log(`rssi =${map(rssi, 0, 31, 0, 100)}%`);
       rssi = (2 * rssi) - 113;
       return rssi;
     });
@@ -44,7 +51,7 @@ function BC95({port, baudRate}, cb) {
     console.log(`AT+NSOST=${socketId},${ip},${port},2,${payloadHex}`);
 
     return _modem.call(
-        `AT+NSOST=${socketId},${ip},${port},2,${payloadHex}`);
+        `AT+NSOST=${socketId},${ip},${port},${payload.length},${payloadHex}`);
   };
 
   this.call = (cmd) => {
