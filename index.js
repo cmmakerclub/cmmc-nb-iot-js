@@ -2,13 +2,10 @@ const BC95 = require('./BC95');
 
 const bc95 = new BC95({port: '/dev/tty.usbmodem1411', baudRate: 9600});
 // const bc95 = new BC95({port: '/dev/tty.usbserial-DO01E4MX', baudRate: 9600});
+
 const startMs = new Date().getTime();
 
 setTimeout(() => {
-  bc95.call('AT').then(({cmd, resp}) => {
-    console.log(resp);
-  });
-
   bc95.resetModule((err, result) => {
     if (err) {
       console.log('error reset module.');
@@ -33,7 +30,6 @@ bc95.on('connected', function() {
         setInterval(() => {
           bc95.sendUDPMessage(0, '103.212.181.167', '3002', buffer);
         }, 5000);
-        console.log(sockets);
       }).
       catch(err => {
         console.log(`catch error = `, err);
@@ -46,8 +42,13 @@ bc95.on('connecting', function() {
   console.log('attaching NB-IoT network.');
 });
 
-bc95.on('data', function(args) {
-  console.log(`on bc95 data = `, args);
+bc95.on('data', payload => {
+  // console.log(payload);
+  console.log(`bc95 on_data = `,
+      Buffer.from(payload.data, 'HEX').toString());
 });
 
-// bc95.on('')
+bc95.on('update', (args) => {
+  console.log(`rssi =${bc95.rssi} rssi_percent=${bc95.rssi_percent}%`);
+});
+

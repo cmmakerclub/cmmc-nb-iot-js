@@ -7,6 +7,8 @@ function BC95({port, baudRate}) {
   this.ipAddress;
   this.imei = null;
   this.imsi = null;
+  this.rssi = 0;
+  this.rssi_percent = 0;
   let _buffer = [];
 
   let _modem = new Modem({port, baudRate}, {
@@ -26,24 +28,25 @@ function BC95({port, baudRate}) {
       }
       else {
         const matcher = {
-          'NSONMI': /^\+NSONMI:(\d),(\d)$/,
+          'NSONMI': /^\+NSONMI:(\d+),(\d+)$/,
         };
-
         if (matcher.NSONMI.test(resp)) {
-          console.log(resp);
+          console.log('RESP=>', resp);
           const [match, socket, len] = resp.match(matcher.NSONMI);
           console.log(`found +NSONMI socket=${socket}, len=${len}`);
           _modem.call(`AT+NSORF=${socket},${len}`).then(response => {
             let [socket, ip_addr, port, length, data, remaining_length] =
                 response.resp[1].split(',');
-            console.log(socket, ip_addr, port, length, data, remaining_length);
-            console.log(Buffer.from(data).toString());
+            // console.log(socket, ip_addr, port, length, data, remaining_length);
+            // console.log(Buffer.from(data).toString());
+            let args = {socket, ip_addr, port, length, data, remaining_length};
+            this.emit('data', args);
           });
         }
       }
     },
     onOpen: function() {
-      console.log('cb onOpen');
+      // console.log('cb onOpen');
     },
   });
 
@@ -52,12 +55,24 @@ function BC95({port, baudRate}) {
   this.processIncommingData = () => {
     return this.call(`AT+NSORF=${0},${512}`).
         then(response => {
-          if (response.resp[0] !== 'OK') {
+          console.log(response.resp[0]);
+          console.log(response.cmd);
+          console.log(/^\+NSONMI:(\d),(\d)/.test(response.resp[0]));
+          if (/^\+NSONMI:(\d),(\d)/.test(response.resp[0])) {
+            console.log('>found NSONMI');
+          }
+          else if (response.resp[0] !== 'OK') {
             let [socket, ip_addr, port, length, data, remaining_length] =
                 response.resp[0].split(',');
-            this.emit('data',
-                {socket, ip_addr, port, length, data, remaining_length});
+            let args = {socket, ip_addr, port, length, data, remaining_length};
+            this.emit('data', args);
+            return args;
           }
+          else {
+            // console.log('at+nsorf', response);
+          }
+        }).catch(err => {
+          console.log(`on_data error =`, err);
         });
   };
 
@@ -80,7 +95,6 @@ function BC95({port, baudRate}) {
       let rssi = splittedArray[0].split(':')[1];
       const percent = map(rssi, 0, 31, 0, 100).toFixed(2);
       rssi = (2 * rssi) - 113;
-      console.log(`rssi ${rssi} ${percent}%`);
       return {rssi, percent};
     });
   };
@@ -93,8 +107,8 @@ function BC95({port, baudRate}) {
   this.sendUDPMessage = (socketId, ip, port, payload) => {
     const seq = 1;
     const payloadHex = payload.toString('hex');
-    console.log(
-        `AT+NSOST=${socketId},${ip},${port},${payload.length},${payloadHex}`);
+    // console.log(
+    //     `AT+NSOST=${socketId},${ip},${port},${payload.length},${payloadHex}`);
 
     return _modem.call(
         `AT+NSOST=${socketId},${ip},${port},${payload.length},${payloadHex}`);
@@ -139,14 +153,19 @@ function BC95({port, baudRate}) {
 
     this.mainInterval = setInterval(() => {
       if (this.neverConnected) return;
-      this.updateNBAttributes();
-      this.processIncommingData();
+      Promise.all([this.updateNBAttributes()]).
+          then(results => {
+            this.emit('update');
+          });
     }, 10 * 1000);
 
     setInterval(() => {
       if (this.neverConnected) return;
-    }, 10 * 1000);
-
+      // Promise.all([this.processIncommingData()]).
+      //     then(results => {
+      //       this.emit('update');
+      //     });
+    }, 2 * 1000);
   };
 
   this.queryIMEI = () => {
@@ -175,6 +194,7 @@ function BC95({port, baudRate}) {
           this.queryRSSI().then(args => {
             let {rssi, percent} = args;
             this.rssi = rssi;
+            this.rssi_percent = percent;
             return args;
           }),
         ],
