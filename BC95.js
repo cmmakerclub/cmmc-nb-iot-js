@@ -2,22 +2,20 @@ const Modem = require('./Modem');
 const EventEmitter = require('events').EventEmitter;
 const util = require('util');
 
-function BC95({port, baudRate}, cb) {
+function BC95({port, baudRate}) {
   this.neverConnected = true;
   this.ipAddress;
-  this.imei;
-  this.imsi;
+  this.imei = null;
+  this.imsi = null;
   let _buffer = [];
 
   let _modem = new Modem({port, baudRate}, {
-    onData: (args) => {
+    onSerialData: (args) => {
       let {
         resolve, reject, cmd, resp,
       } = args;
       resp = resp.toString();
       _buffer.push(resp);
-
-      // console.log(`____ ${resp}`);
       if (resp === 'OK') {
         resolve().with({cmd, resp: _buffer});
         _buffer = [];
@@ -34,18 +32,14 @@ function BC95({port, baudRate}, cb) {
         if (matcher.NSONMI.test(resp)) {
           console.log(resp);
           const [match, socket, len] = resp.match(matcher.NSONMI);
-          console.log(`found NSONMI socket=${socket}, len=${len}`);
+          console.log(`found +NSONMI socket=${socket}, len=${len}`);
           _modem.call(`AT+NSORF=${socket},${len}`).then(response => {
-            // '0,103.212.181.167,50056,3,AABBCC,0',
             let [socket, ip_addr, port, length, data, remaining_length] =
                 response.resp[1].split(',');
             console.log(socket, ip_addr, port, length, data, remaining_length);
             console.log(Buffer.from(data).toString());
           });
         }
-        // else {
-        //   console.log('ELSE.. ' + resp);
-        // }
       }
     },
     onOpen: function() {
@@ -59,13 +53,10 @@ function BC95({port, baudRate}, cb) {
     return this.call(`AT+NSORF=${0},${512}`).
         then(response => {
           if (response.resp[0] !== 'OK') {
-            // console.log(response.resp);
             let [socket, ip_addr, port, length, data, remaining_length] =
                 response.resp[0].split(',');
-            let payload = Buffer.from(data, 'HEX');
-            console.log(
-                `incomming payload = ${payload} from ${ip_addr}:${port}`);
-            // console.log(payload.toString());
+            this.emit('data',
+                {socket, ip_addr, port, length, data, remaining_length});
           }
         });
   };
@@ -136,7 +127,8 @@ function BC95({port, baudRate}, cb) {
             clearInterval(intervalId);
             this.emit('connected');
             this.queryIMSI().then((result) => {
-              console.log(result);
+              console.log(`IMSI = ${result.resp[0]}`);
+              this.imsi = result.resp[0];
             });
           });
         } else {

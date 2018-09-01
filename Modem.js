@@ -51,12 +51,12 @@ function Modem(options, callbacks = {}) {
 
   _parser.on('data', data => {
     _current_task.resp = data;
-    this.onData(_current_task);
+    this.onSerialData(_current_task);
   });
 
-  this.onData = function(data) {
-    const onData = callbacks.onData;
-    onData && onData(data);
+  this.onSerialData = function(data) {
+    const onSerialData = callbacks.onSerialData;
+    onSerialData && onSerialData(data);
   };
 
   let send = cmd => {

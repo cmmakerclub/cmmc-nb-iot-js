@@ -23,9 +23,8 @@ setTimeout(() => {
 bc95.on('connected', function() {
   console.log(`nb connected with ip=${bc95.ipAddr}, rssi=${bc95.rssi}`);
   let sockets = [];
-
   const port = (new Date().getTime()) % 10000;
-  console.log(`port=${port + 8000}`);
+
   bc95.createUDPSocket(port + 8000, 1).
       then(result => {
         const sockId = result.resp[0].toString();
@@ -40,15 +39,15 @@ bc95.on('connected', function() {
         console.log(`catch error = `, err);
       });
 
-  // bc95.createUDPSocket(11224, 1).then(result => {
-  //   const sockId = result.resp[0].toString();
-  //   sockets.push(parseInt(sockId));
-  //   console.log(sockets);
-  // }).catch(err => {
-  //   console.log(`catch error = `, err);
-  // });
+  console.log(`port=${port + 8000}`);
 });
 
 bc95.on('connecting', function() {
   console.log('attaching NB-IoT network.');
 });
+
+bc95.on('data', function(args) {
+  console.log(`on bc95 data = `, args);
+});
+
+// bc95.on('')
