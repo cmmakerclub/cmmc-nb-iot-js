@@ -89,21 +89,22 @@ function BC95({port, baudRate}, cb) {
             if (this.nbConnected !== connected) {
               this.nbConnected = connected;
               if (connected) {
-                const afterConnectedPromises = [
-                  this.queryIpAddress().then(ip => {
-                    this.ipAddr = ip;
-                  }),
-                  this.queryRSSI().then(rssi => {
-                    this.rssi = rssi;
-                  }),
-                ];
-                Promise.all(afterConnectedPromises).then(results => {
-                  this.emit('connected');
-                  clearInterval(intervalId);
-                });
+                Promise.
+                    all([
+                      this.queryIpAddress().then(ip => {
+                        this.ipAddr = ip;
+                      }), this.queryRSSI().then(rssi => {
+                        this.rssi = rssi;
+                      }),
+                    ]).
+                    then(results => {
+                      this.emit('connected');
+                      clearInterval(intervalId);
+                    });
               }
-              else
+              else {
                 this.emit('disconnected');
+              }
             }
             else {
               if (!this.nbConnected) {
