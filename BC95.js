@@ -17,9 +17,10 @@ function BC95({port, baudRate}) {
         resolve, reject, cmd, resp,
       } = args;
       resp = resp.toString();
-      _buffer.push(resp);
       if (resp === 'OK') {
-        resolve().with({cmd, resp: _buffer});
+        let payload = {cmd, resp: _buffer};
+        console.log(`being resolve with `, payload);
+        resolve().with(payload);
         _buffer = [];
       }
       else if (resp === 'ERROR') {
@@ -32,35 +33,40 @@ function BC95({port, baudRate}) {
         const processors = {
           'NSONMI': /^\+NSONMI:(\d+),(\d+)$/,
           'CSQ': /^\+CSQ:(\d+),(\d+)$/,
+          'CGATT': /^\+CGATT:(\d)$/,
         };
         console.log(`> EVENT=${e[1]}`);
         if (event === 'NSONMI') {
-          const [match, socket, len] = resp.match(processors.NSONMI);
-          console.log(`found +NSONMI socket=${socket}, len=${len}`);
-          _modem.call(`AT+NSORF=${socket},${len}`).then(response => {
-            let [socket, ip_addr, port, length, data, remaining_length] =
-                response.resp[1].split(',');
-            let args = {socket, ip_addr, port, length, data, remaining_length};
-            _buffer = [];
-            this.emit('data', args);
-          });
+          const [match, socketId, len] = resp.match(processors.NSONMI);
+          console.log(`found +NSONMI socket=${socketId}, len=${len}`);
+          // _modem.call(`AT+NSORF=${socket},${len}`).then(response => {
+          //   let [socket, ip_addr, port, length, data, remaining_length] =
+          //       response.resp[1].split(',');
+          //   let args = {socket, ip_addr, port, length, data, remaining_length};
+          //   _buffer = [args];
+          //   this.emit('data', args);
+          // });
         }
         else if (event === 'CSQ') {
-          let [match, rssi, ber] = resp.match(processors.CSQ);
+          let [match, raw_rssi, ber] = resp.match(processors.CSQ);
           const map = (x, in_min, in_max, out_min, out_max) => (x - in_min) *
               (out_max - out_min) / (in_max - in_min) + out_min;
-          console.log(match, rssi, ber);
-          this.rssi = (2 * rssi) - 113;
-          this.rssi_percent = map(rssi, 0, 31, 0, 100).toFixed(2);
+          let rssi = (2 * raw_rssi) - 113;
+          rssi_percent = map(raw_rssi, 0, 31, 0, 100).toFixed(2);
+          _buffer.push(match, {raw_rssi, rssi_percent, rssi, ber});
         }
         else if (event === 'CGATT') {
+          let [match, status] = resp.match(processors.CGATT);
+          status = parseInt(status) === 1;
+          _buffer.push(match, {status});
         }
         else {
           console.log(`${event} is NOT IMPLEMENTED EVENT`);
+          _buffer.push(resp);
         }
       }
       else {
-        console.log('PENDING DATA >> ', resp);
+        _buffer.push(resp);
       }
     },
     onOpen: function() {

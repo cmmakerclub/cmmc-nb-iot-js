@@ -22,18 +22,25 @@ bc95.on('connected', function() {
   let sockets = [];
   const port = (new Date().getTime()) % 10000;
 
-  // bc95.createUDPSocket(port + 8000, 1).
-  //     then(result => {
-  //       const sockId = result.resp[0].toString();
-  //       sockets.push(parseInt(sockId));
-  //       var buffer = Buffer.from('HELLO WORLD');
-  //       setInterval(() => {
-  //         bc95.sendUDPMessage(0, '103.212.181.167', '3002', buffer);
-  //       }, 5000);
-  //     }).
-  //     catch(err => {
-  //       console.log(`catch error = `, err);
-  //     });
+  bc95.createUDPSocket(port + 8000, 1).
+      then(result => {
+        const sockId = result.resp[0].toString();
+        sockets.push(parseInt(sockId));
+        var buffer = Buffer.from(
+            `HELLO WORLD: ${new Date().getTime() - startMs}`);
+        setInterval(() => {
+          bc95.sendUDPMessage(0, '103.212.181.167', '3002', buffer).
+              then(res => {
+                console.log(`send ok with `, res);
+              }).
+              catch(err => {
+                console.log(`send error with`, err);
+              });
+        }, 2000);
+      }).
+      catch(err => {
+        console.log(`catch error = `, err);
+      });
 
   console.log(`port=${port + 8000}`);
 });
