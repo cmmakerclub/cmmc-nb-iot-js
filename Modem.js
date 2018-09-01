@@ -67,7 +67,7 @@ function Modem(options, callbacks = {}) {
   };
 
   this.call = (cmd) => {
-    console.log(`[enqueue] modem.call ${cmd} q=${_queue.size()}`);
+    // console.log(`[enqueue] modem.call ${cmd} q=${_queue.size()}`);
     const data = {
       promise: null,
       resolve: null,

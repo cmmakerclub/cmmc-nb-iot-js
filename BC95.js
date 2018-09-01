@@ -5,7 +5,8 @@ const util = require('util');
 function BC95({port, baudRate}, cb) {
   this.neverConnected = true;
   this.ipAddress;
-  this.firstConect = true;
+  this.imei;
+  this.imsi;
   let _buffer = [];
 
   let _modem = new Modem({port, baudRate}, {
@@ -15,6 +16,8 @@ function BC95({port, baudRate}, cb) {
       } = args;
       resp = resp.toString();
       _buffer.push(resp);
+
+      // console.log(`____ ${resp}`);
       if (resp === 'OK') {
         resolve().with({cmd, resp: _buffer});
         _buffer = [];
@@ -24,8 +27,25 @@ function BC95({port, baudRate}, cb) {
         _buffer = [];
       }
       else {
-        // console.log('ELSE: ' + cmd);
-        // console.log('>>>', _buffer[0]);
+        const matcher = {
+          'NSONMI': /^\+NSONMI:(\d),(\d)$/,
+        };
+
+        if (matcher.NSONMI.test(resp)) {
+          console.log(resp);
+          const [match, socket, len] = resp.match(matcher.NSONMI);
+          console.log(`found NSONMI socket=${socket}, len=${len}`);
+          _modem.call(`AT+NSORF=${socket},${len}`).then(response => {
+            // '0,103.212.181.167,50056,3,AABBCC,0',
+            let [socket, ip_addr, port, length, data, remaining_length] =
+                response.resp[1].split(',');
+            console.log(socket, ip_addr, port, length, data, remaining_length);
+            console.log(Buffer.from(data).toString());
+          });
+        }
+        // else {
+        //   console.log('ELSE.. ' + resp);
+        // }
       }
     },
     onOpen: function() {
@@ -35,11 +55,30 @@ function BC95({port, baudRate}, cb) {
 
   EventEmitter.call(this);
 
+  this.processIncommingData = () => {
+    return this.call(`AT+NSORF=${0},${512}`).
+        then(response => {
+          if (response.resp[0] !== 'OK') {
+            // console.log(response.resp);
+            let [socket, ip_addr, port, length, data, remaining_length] =
+                response.resp[0].split(',');
+            let payload = Buffer.from(data, 'HEX');
+            console.log(
+                `incomming payload = ${payload} from ${ip_addr}:${port}`);
+            // console.log(payload.toString());
+          }
+        });
+  };
+
   this.queryIpAddress = () => {
     return _modem.call('AT+CGPADDR').then(result => {
       let splittedArray = result.resp.toString().split(',');
       return {ip: splittedArray[1]};
     });
+  };
+
+  this.queryFirmwareVersion = () => {
+    return _modem.call('AT+CGMR');
   };
 
   this.queryRSSI = () => {
@@ -63,19 +102,32 @@ function BC95({port, baudRate}, cb) {
   this.sendUDPMessage = (socketId, ip, port, payload) => {
     const seq = 1;
     const payloadHex = payload.toString('hex');
-    console.log('at', payloadHex);
-    console.log(`AT+NSOST=${socketId},${ip},${port},2,${payloadHex}`);
+    console.log(
+        `AT+NSOST=${socketId},${ip},${port},${payload.length},${payloadHex}`);
 
     return _modem.call(
         `AT+NSOST=${socketId},${ip},${port},${payload.length},${payloadHex}`);
   };
 
-  this.call = (cmd) => {
-    return _modem.call(cmd);
-  };
+  this.call = (cmd) => _modem.call(cmd);
 
   this.begin = () => {
-    console.log('begin called');
+    console.log('begin.');
+
+    this.queryFirmwareVersion().then(result => {
+      console.log('fw = ', result);
+    });
+
+    this.queryIMEI().then((result) => {
+      let t = /\+CGSN:(\d+)/;
+      let str = result.resp[0];
+      let matched = result.resp[0].match(t);
+      if (matched) {
+        console.log(`IMEI = ${matched[1]}`);
+        this.imei = matched[1];
+      }
+    });
+
     const intervalId = setInterval(() => {
       this.isAttachedNB().then(isConnected => {
         if (isConnected) {
@@ -83,6 +135,9 @@ function BC95({port, baudRate}, cb) {
             this.neverConnected = false;
             clearInterval(intervalId);
             this.emit('connected');
+            this.queryIMSI().then((result) => {
+              console.log(result);
+            });
           });
         } else {
           this.emit('connecting');
@@ -92,10 +147,22 @@ function BC95({port, baudRate}, cb) {
 
     this.mainInterval = setInterval(() => {
       if (this.neverConnected) return;
-      this.updateNBAttributes().then((results) => {
-        console.log('main interval.');
-      });
-    }, 30 * 1000);
+      this.updateNBAttributes();
+      this.processIncommingData();
+    }, 10 * 1000);
+
+    setInterval(() => {
+      if (this.neverConnected) return;
+    }, 10 * 1000);
+
+  };
+
+  this.queryIMEI = () => {
+    return _modem.call('AT+CGSN=1');
+  };
+
+  this.queryIMSI = () => {
+    return _modem.call('AT+CIMI');
   };
 
   this.isAttachedNB = () => {
