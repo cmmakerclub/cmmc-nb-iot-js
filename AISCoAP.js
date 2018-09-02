@@ -45,14 +45,14 @@ function AISMagellan(token, modem) {
 
     byte1.writeUInt8(version | type);
     byte2.writeUInt8(0b00000000 | 2);
-    msgId.writeInt16LE(ct);
+    msgId.writeUInt16LE(ct);
 
     const b = Buffer.concat([
-      Buffer.from(byte1),
-      Buffer.from(byte2),
-      Buffer.from(msgId),
+      Buffer.from(byte1), // 40
+      Buffer.from(byte2), // 02
+      Buffer.from(msgId), // .....
       Buffer.from('b5', 'hex'),
-      Buffer.from('4e42496f54', 'hex'),
+      Buffer.from('4e42496f54', 'hex'), // NBIoT
       Buffer.from('0d', 'hex'),
       Buffer.from('17', 'hex'),
       Buffer.from(_token),

@@ -70,7 +70,6 @@ function BC95({port, baudRate}) {
     },
     onOpen: function() {
       _ready = true;
-      console.log('ready ja');
     },
   });
 
@@ -235,7 +234,7 @@ function BC95({port, baudRate}) {
           fn();
         }, 500);
       }
-    }, 100);
+    }, 1000);
   };
 
 }
