@@ -28,22 +28,15 @@ bc95.on('connected', function() {
   const port = 10000;
   bc95.createUDPSocket(port + 8000, 1).
       then(result => {
-        // const sockId = result.resp[0].toString();
-        // sockets.push(parseInt(sockId));
         setInterval(() => {
-          bc95.sendUDPMessage(0, '103.20.205.85', '5683',
-              Buffer.from(aisNBIoTAdapter.getHexString(), 'hex')).
-              then(result => {
-                // console.log(`+ sent with ${result.resp}`);
-              }).
-              catch(err => {
-                // console.log(`+ send error with`, err);
-              });
+          const msg = Buffer.from(aisNBIoTAdapter.getHexString(), 'hex');
+          bc95.sendUDPMessage(0, '103.20.205.85', '5683', msg).
+              then(result => { }).
+              catch(err => { });
         }, 2 * 1000);
-        console.log();
       }).
       catch(err => {
-        console.log(`- catch error = `, err);
+        console.log(`- create socket error with`, err);
       });
 });
 
