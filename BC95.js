@@ -35,7 +35,7 @@ function BC95({port, baudRate}) {
           'CSQ': /^\+CSQ:(\d+),(\d+)$/,
           'CGATT': /^\+CGATT:(\d)$/,
         };
-        console.log(`> EVENT=${e[1]}`);
+        // console.log(`> EVENT=${e[1]}`);
         if (event === 'NSONMI') {
           const [match, socketId, len] = resp.match(processors.NSONMI);
           _modem.call(`AT+NSORF=${socketId},${len}`).then(response => {
@@ -59,7 +59,7 @@ function BC95({port, baudRate}) {
           _promiseArgs.push(match, {status});
         }
         else {
-          console.log(`${event} is NOT IMPLEMENTED EVENT`);
+          console.log(`${event} is NOT IMPLEMENTED.`);
           _promiseArgs.push(resp);
         }
       }
@@ -118,22 +118,21 @@ function BC95({port, baudRate}) {
       let str = result.resp[0];
       let matched = result.resp[0].match(t);
       if (matched) {
-        console.log(`IMEI = ${matched[1]}`);
         this.imei = matched[1];
       }
     });
 
-    this.call('AT+CFUN=1').then((result) => {
-      console.log(result);
-    });
-
-    this.call('AT+CFUN?').then((result) => {
-      console.log(result);
-    });
-
-    this.call('AT+CGATT=1').then((result) => {
-      console.log(result);
-    });
+    // this.call('AT+CFUN=1').then((result) => {
+    //   console.log(result);
+    // });
+    //
+    // this.call('AT+CFUN?').then((result) => {
+    //   console.log(result);
+    // });
+    //
+    // this.call('AT+CGATT=1').then((result) => {
+    //   console.log(result);
+    // });
 
     const intervalId = setInterval(() => {
       this.isAttachedNB().then(isConnected => {
@@ -143,7 +142,6 @@ function BC95({port, baudRate}) {
             clearInterval(intervalId);
             this.emit('connected');
             this.queryIMSI().then((result) => {
-              console.log(`IMSI = ${result.resp[0]}`);
               this.imsi = result.resp[0];
             });
           });
