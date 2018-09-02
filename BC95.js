@@ -10,6 +10,7 @@ function BC95({port, baudRate}) {
   this.rssi = 0;
   this.rssi_percent = 0;
   let _promiseArgs = [];
+  let _ready = false;
 
   let _modem = new Modem({port, baudRate}, {
     onSerialData: (args) => {
@@ -68,7 +69,8 @@ function BC95({port, baudRate}) {
       }
     },
     onOpen: function() {
-      // console.log('cb onOpen');
+      _ready = true;
+      console.log('ready ja');
     },
   });
 
@@ -108,7 +110,6 @@ function BC95({port, baudRate}) {
 
   this.begin = () => {
     console.log('begin.');
-
     this.queryFirmwareVersion().then(result => {
       console.log('fw = ', result);
     });
@@ -224,6 +225,17 @@ function BC95({port, baudRate}) {
         }).catch(err => {
           cb(err, null);
         });
+  };
+
+  this.ready = (fn) => {
+    let interval = setInterval(() => {
+      if (_ready) {
+        clearInterval(interval);
+        setTimeout(function() {
+          fn();
+        }, 500);
+      }
+    }, 100);
   };
 
 }
