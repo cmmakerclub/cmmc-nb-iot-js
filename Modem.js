@@ -77,12 +77,12 @@ function Modem(options, callbacks = {}) {
     let deferred = (d => (resolve, reject) => {
       d.resolve = () => {
         _pending = false;
-        console.log(`>> resolved`);
+        // console.log(`>> resolved`);
         return {with: resolve};
       };
       d.reject = () => {
         _pending = false;
-        console.log(`>> rejected`);
+        // console.log(`>> rejected`);
         return {with: reject};
       };
     })(data);

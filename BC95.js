@@ -9,7 +9,7 @@ function BC95({port, baudRate}) {
   this.imsi = null;
   this.rssi = 0;
   this.rssi_percent = 0;
-  let _buffer = [];
+  let _promiseArgs = [];
 
   let _modem = new Modem({port, baudRate}, {
     onSerialData: (args) => {
@@ -18,14 +18,14 @@ function BC95({port, baudRate}) {
       } = args;
       resp = resp.toString();
       if (resp === 'OK') {
-        let payload = {cmd, resp: _buffer};
-        console.log(`being resolve with `, payload);
+        let payload = {cmd, resp: _promiseArgs};
+        // console.log(`being resolve with `, payload);
         resolve().with(payload);
-        _buffer = [];
+        _promiseArgs = [];
       }
       else if (resp === 'ERROR') {
-        reject().with({cmd, resp: _buffer});
-        _buffer = [];
+        reject().with({cmd, resp: _promiseArgs});
+        _promiseArgs = [];
       }
       else if (/^\+/.test(resp)) {
         const e = resp.match(/^\+(\w+):/);
@@ -38,19 +38,10 @@ function BC95({port, baudRate}) {
         console.log(`> EVENT=${e[1]}`);
         if (event === 'NSONMI') {
           const [match, socketId, len] = resp.match(processors.NSONMI);
-          console.log(`found +NSONMI socket=${socketId}, len=${len}`);
           _modem.call(`AT+NSORF=${socketId},${len}`).then(response => {
             const d = response.resp[0].split(',');
-            // <socket>,<ip_addr>,<port>,<length>,<data>,<remaining_ length>
-            // 0,192.168.5.1,1024,2,ABAB,0
-            // const matcher = /^(\d+),(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}),(\d+),(\d+),(\w+),(\d+)/;
-            // const matched = response.resp[0].match(matcher);
-            // console.log(matcher);
             let [socket, ip_addr, port, length, data, remaining_length] = d;
-            //     response.resp[0].match(
-            //         /^(\d+),(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}),(\d+),(\d+),(\w+),(\d+)/g);
             let args = {socket, ip_addr, port, length, data, remaining_length};
-            console.log(args);
             this.emit('data', args);
           });
         }
@@ -60,20 +51,20 @@ function BC95({port, baudRate}) {
               (out_max - out_min) / (in_max - in_min) + out_min;
           let rssi = (2 * raw_rssi) - 113;
           rssi_percent = map(raw_rssi, 0, 31, 0, 100).toFixed(2);
-          _buffer.push(match, {raw_rssi, rssi_percent, rssi, ber});
+          _promiseArgs.push(match, {raw_rssi, rssi_percent, rssi, ber});
         }
         else if (event === 'CGATT') {
           let [match, status] = resp.match(processors.CGATT);
           status = parseInt(status) === 1;
-          _buffer.push(match, {status});
+          _promiseArgs.push(match, {status});
         }
         else {
           console.log(`${event} is NOT IMPLEMENTED EVENT`);
-          _buffer.push(resp);
+          _promiseArgs.push(resp);
         }
       }
       else {
-        _buffer.push(resp);
+        _promiseArgs.push(resp);
       }
     },
     onOpen: function() {
@@ -132,6 +123,18 @@ function BC95({port, baudRate}) {
       }
     });
 
+    this.call('AT+CFUN=1').then((result) => {
+      console.log(result);
+    });
+
+    this.call('AT+CFUN?').then((result) => {
+      console.log(result);
+    });
+
+    this.call('AT+CGATT=1').then((result) => {
+      console.log(result);
+    });
+
     const intervalId = setInterval(() => {
       this.isAttachedNB().then(isConnected => {
         if (isConnected) {
@@ -150,13 +153,13 @@ function BC95({port, baudRate}) {
       });
     }, 2000);
 
-    // this.mainInterval = setInterval(() => {
-    //   if (this.neverConnected) return;
-    //   Promise.all([this.updateNBAttributes()]).
-    //       then(results => {
-    //         this.emit('update');
-    //       });
-    // }, 1 * 1000);
+    this.mainInterval = setInterval(() => {
+      if (this.neverConnected) return;
+      Promise.all([this.queryRSSI()]).
+          then(results => {
+            this.emit('update');
+          });
+    }, 10 * 1000);
     //
     // setInterval(() => {
     //   if (this.neverConnected) return;
@@ -190,11 +193,10 @@ function BC95({port, baudRate}) {
             this.ipAddr = ip;
             return args;
           }),
-          this.queryRSSI().then(args => {
-            console.log('rssi = ', args);
-            let {rssi, percent} = args;
-            this.rssi = rssi;
-            this.rssi_percent = percent;
+          this.queryRSSI().then((args) => {
+            let {cmd, resp} = args;
+            this.rssi = args.resp[1].rssi;
+            this.rssi_percent = args.resp[1].rssi_percent;
             return args;
           }),
         ],
@@ -218,12 +220,10 @@ function BC95({port, baudRate}) {
   this.resetModule = (cb) => {
     return _modem.call('AT+NRB').
         then(result => {
-          console.log('NRB result');
           if (cb) {
             cb(false, result);
           }
         }).catch(err => {
-          console.log('catch');
           cb(err, null);
         });
   };

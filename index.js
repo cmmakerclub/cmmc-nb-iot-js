@@ -4,6 +4,7 @@ const bc95 = new BC95({port: '/dev/tty.usbmodem1411', baudRate: 9600});
 // const bc95 = new BC95({port: '/dev/tty.usbserial-DO01E4MX', baudRate: 9600});
 
 const startMs = new Date().getTime();
+let counter = 0;
 
 setTimeout(() => {
   bc95.resetModule((err, result) => {
@@ -20,23 +21,23 @@ setTimeout(() => {
 bc95.on('connected', function() {
   console.log(`nb connected with ip=${bc95.ipAddr}, rssi=${bc95.rssi}`);
   let sockets = [];
-  const port = (new Date().getTime()) % 10000;
+  // const port = (new Date().getTime()) % 10000;
+  const port = 10000;
 
   bc95.createUDPSocket(port + 8000, 1).
       then(result => {
         const sockId = result.resp[0].toString();
         sockets.push(parseInt(sockId));
-        var buffer = Buffer.from(
-            `HELLO WORLD: ${new Date().getTime() - startMs}`);
+        var buffer = Buffer.from(`HELLO WORLD: ${++counter}`);
         setInterval(() => {
           bc95.sendUDPMessage(0, '103.212.181.167', '3002', buffer).
               then(res => {
-                console.log(`send ok with `, res);
+                // console.log(`send ok with `, res);
               }).
               catch(err => {
-                console.log(`send error with`, err);
+                // console.log(`send error with`, err);
               });
-        }, 2000);
+        }, 10 * 1000);
       }).
       catch(err => {
         console.log(`catch error = `, err);
@@ -50,7 +51,7 @@ bc95.on('connecting', function() {
 });
 
 bc95.on('data', payload => {
-  console.log(payload);
+  // console.log(payload);
   console.log(`bc95 on_data = `,
       Buffer.from(payload.data, 'HEX').toString());
 });
