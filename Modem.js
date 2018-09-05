@@ -65,8 +65,6 @@ function Modem(options, callbacks = {}) {
   };
 
   this.call = (cmd) => {
-    // console.log(`>> ${cmd} q=${_queue.size()}`,
-    //     _queue.tasks.map(t => t.cmd));
     const data = {
       promise: null,
       resolve: null,
@@ -77,12 +75,10 @@ function Modem(options, callbacks = {}) {
     let deferred = (d => (resolve, reject) => {
       d.resolve = () => {
         _pending = false;
-        // console.log(`>> resolved`);
         return {with: resolve};
       };
       d.reject = () => {
         _pending = false;
-        // console.log(`>> rejected`);
         return {with: reject};
       };
     })(data);
@@ -92,7 +88,6 @@ function Modem(options, callbacks = {}) {
     _queue.push(data);
     return data.promise;
   };
-
 }
 
 module.exports = Modem;
